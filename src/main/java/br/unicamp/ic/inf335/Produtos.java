@@ -1,6 +1,7 @@
 package br.unicamp.ic.inf335;
 
 import com.mongodb.MongoException;
+import com.mongodb.client.result.DeleteResult;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 
@@ -13,8 +14,13 @@ import org.bson.conversions.Bson;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.result.InsertOneResult;
+import com.mongodb.client.model.UpdateOptions;
+import com.mongodb.client.model.Updates;
+import com.mongodb.client.result.UpdateResult;
 
 import java.util.Arrays;
+
+import static com.mongodb.client.model.Filters.eq;
 
 public class Produtos
 {
@@ -62,22 +68,58 @@ public class Produtos
 
     }
 
-    public void alteraValorProduto(MongoClient conn, String idProduto, String valor){
+    public void alteraValorProduto(MongoClient conn, String nome, String valor){
 
+        MongoDatabase database = conn.getDatabase("mongoAdmin");
+
+        MongoCollection<Document> collection = database.getCollection("produtos");
+
+        Document query = new Document().append("nome", nome);
+
+        Bson updates = Updates.combine(
+                Updates.set("valor", valor));
+
+        UpdateOptions options = new UpdateOptions().upsert(true);
+        try{
+            UpdateResult result = collection.updateOne(query, updates, options);
+            System.out.println("Documentos alterados: " + result.getUpsertedId());
+        } catch (MongoException me) {
+            System.err.println("Erro ao alterar valor de item devido a erro:" + me);
+        }
     }
 
-    public void apagaProduto(MongoClient conn, String idProduto){
+    public void apagaProduto(MongoClient conn, String nome){
+        MongoDatabase database = conn.getDatabase("mongoAdmin");
 
+        MongoCollection<Document> collection = database.getCollection("produtos");
+        Bson query = eq("nome", nome);
+        try{
+            DeleteResult result = collection.deleteOne(query);
+            System.out.println("Documentos deletados: " + result.getDeletedCount());
+        } catch (MongoException me) {
+            System.err.println("Erro ao apagar item devido a erro:" + me);
+        }
     }
 
     public static void main(String[] args){
         Produtos produto = new Produtos();
 
         MongoClient conn = produto.conectar("mongoAdmin","INF335UNICAMP","localhost:27017");
+        System.out.println("=== Lista inicial de produtos. ===");
+        produto.listaProdutos(conn);
+
+        System.out.println("\n=== Inserção de um item. ===");
+        produto.insereProduto(conn,"Prod6","Celular antigo","200.0","Produto antigo");
 
         produto.listaProdutos(conn);
 
-        produto.insereProduto(conn,"Prod6","Celular antigo","200.0","Produto antigo");
+        System.out.println("\n=== Alteração de valor de um item. ===");
+        produto.alteraValorProduto(conn,"Prod6","500");
+
+        produto.listaProdutos(conn);
+
+        System.out.println("\n=== Remoção de um item. ===");
+        produto.apagaProduto(conn,"Prod6");
 
         produto.listaProdutos(conn);
     }
